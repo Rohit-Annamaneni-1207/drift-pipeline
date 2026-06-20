@@ -7,6 +7,10 @@ env/
 .env
 .env/
 
+# DS Store and CSVs
+.DS_Store
+*.csv
+
 # Python cache files
 __pycache__/
 *.py[cod]

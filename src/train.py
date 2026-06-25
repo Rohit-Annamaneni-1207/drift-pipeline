@@ -9,6 +9,9 @@ from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
 def load_transaction_data(path="data/train_transaction.csv"):
 
     """
@@ -154,10 +157,13 @@ def temporal_split(X, y, train_ratio=0.7):
 
 def get_candidate_models():
     return {
-        "logistic_regression": LogisticRegression(
-            max_iter=1000,
-            class_weight="balanced"
-        ),
+        "logistic_regression": Pipeline([
+            ("scaler", StandardScaler()),
+            ("classifier", LogisticRegression(
+                max_iter=2000,
+                class_weight="balanced"
+            ))
+        ]),
 
         "random_forest": RandomForestClassifier(
             n_estimators=100,
@@ -171,6 +177,71 @@ def get_candidate_models():
             random_state=42
         )
     }
+
+def cross_validate_models(X_train, y_train, models, n_splits = 5):
+    results = []
+
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    scoring = {
+        "pr_auc": "average_precision",
+        "roc_auc": "roc_auc",
+        "neg_log_loss": "neg_log_loss",
+        "f1": "f1"
+    }
+
+    for name, model in models.items():
+        
+        cv_results = cross_validate(
+            model,
+            X_train,
+            y_train,
+            cv=cv,
+            scoring=scoring,
+            return_train_score=False
+        )
+
+        results.append({
+            "model": name,
+            "mean_pr_auc": np.mean(cv_results["test_pr_auc"]),
+            "std_pr_auc": np.std(cv_results["test_pr_auc"]),
+            "mean_roc_auc": np.mean(cv_results["test_roc_auc"]),
+            "mean_logloss": np.mean(cv_results["test_neg_log_loss"]),
+            "mean_f1": np.mean(cv_results["test_f1"])
+        })
+    
+    return pd.DataFrame(results)
+
+def select_champion(results_df):
+    results_df = results_df.sort_values(
+        by=[
+            "mean_pr_auc",      # primary
+            "mean_roc_auc",     # tie-break 1
+            "mean_logloss"      # tie-break 2
+        ],
+        ascending=[
+            False,
+            False,
+            True
+        ]
+    )
+
+    champion_name = results_df.iloc[0]["model"]
+
+    return champion_name
+
+
+def fit_champion(X_train, y_train, champion_name, models):
+    model = models[champion_name]
+    model.fit(X_train, y_train)
+
+    return model
+
+def save_model(model, version=1):
+    path = f"outputs/model_v{version}.joblib"
+    joblib.dump(model, path)
+
+    return path
 
 def quick_eda(df):
 
@@ -261,3 +332,29 @@ if __name__ == "__main__":
 
     print("\nStream TransactionDT range:")
     print(X_stream["TransactionDT"].min(), "→", X_stream["TransactionDT"].max())
+
+    models = get_candidate_models()
+
+    results_df = cross_validate_models(
+        X_train,
+        y_train,
+        models
+    )
+
+    print("\nModel comparison:")
+    print(results_df)
+
+    champion_name = select_champion(results_df)
+
+    print("\nChampion:", champion_name)
+
+    champion_model = fit_champion(
+        X_train,
+        y_train,
+        champion_name,
+        models
+    )
+
+    model_path = save_model(champion_model)
+
+    print("\nSaved to:", model_path)

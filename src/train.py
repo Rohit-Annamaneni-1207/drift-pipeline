@@ -62,7 +62,7 @@ def drop_high_missing_columns(df, threshold=0.95):
     Returns:
         pd.DataFrame
     """
-    missing_pct = (df.isnull().mean() * 100)
+    missing_pct = df.isnull().mean()
     cols_to_drop = missing_pct[missing_pct > threshold].index
     cleaned_df = df.drop(columns=cols_to_drop)
     return cleaned_df, cols_to_drop
@@ -206,7 +206,7 @@ def cross_validate_models(X_train, y_train, models, n_splits = 5):
             "mean_pr_auc": np.mean(cv_results["test_pr_auc"]),
             "std_pr_auc": np.std(cv_results["test_pr_auc"]),
             "mean_roc_auc": np.mean(cv_results["test_roc_auc"]),
-            "mean_logloss": np.mean(cv_results["test_neg_log_loss"]),
+            "mean_logloss": -np.mean(cv_results["test_neg_log_loss"]),
             "mean_f1": np.mean(cv_results["test_f1"])
         })
     

@@ -10,7 +10,7 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-from train import (
+from src.train import (
     load_transaction_data,
     load_identity_data,
     merge_datasets,

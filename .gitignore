@@ -23,3 +23,5 @@ __pycache__/
 
 *.joblib
 *.json
+
+INTERVIEW_READINESS_GUIDE.md

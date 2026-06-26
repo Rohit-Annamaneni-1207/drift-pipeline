@@ -1,5 +1,6 @@
 import json
 import joblib
+import numpy as np
 import pandas as pd
 
 from sklearn.metrics import (
@@ -8,7 +9,7 @@ from sklearn.metrics import (
     log_loss
 )
 
-from train import (
+from src.train import (
     load_transaction_data,
     load_identity_data,
     merge_datasets,
@@ -38,7 +39,19 @@ def load_baseline_metrics(path="outputs/baseline_metrics.json"):
 # Select top-k important features
 # --------------------------------------------------
 def select_monitor_features(X_train, model, k=10):
-    importances = model.feature_importances_
+    if hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+    elif hasattr(model, "named_steps"):
+        classifier = model.named_steps.get("classifier")
+
+        if classifier is None or not hasattr(classifier, "coef_"):
+            raise ValueError("Unable to extract feature importance from model.")
+
+        importances = np.abs(classifier.coef_).ravel()
+    elif hasattr(model, "coef_"):
+        importances = np.abs(model.coef_).ravel()
+    else:
+        raise ValueError("Unable to extract feature importance from model.")
 
     feature_importance_df = pd.DataFrame({
         "feature": X_train.columns,
